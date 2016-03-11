@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,51 +30,63 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+
+class MPU9250;
+
+#pragma pack(push, 1)
+struct ak8963_regs {
+	uint8_t st1;
+	int16_t x;
+	int16_t y;
+	int16_t z;
+	uint8_t st2;
+};
+#pragma pack(pop)
+
 /**
- * @file commands_muorb_test.c
- * Commands to run for the "qurt_muorb_test" config
- *
- * @author Mark Charlebois <charlebm@gmail.com>
+ * Helper class implementing the magnetometer driver node.
  */
-
-const char *get_commands()
+class MPU9250_mag : public device::CDev
 {
-	static const char *commands =
-		"uorb start\n"
-		"muorb_test start\n";
+public:
+	MPU9250_mag(MPU9250 *parent, const char *path);
+	~MPU9250_mag();
 
-	/*
-	                  "hil mode_pwm\n"
-	                  "mixer load /dev/pwm_output0 /startup/quad_x.main.mix\n";
-	*/
-	/*
-	                  "param show\n"
-	                  "param set CAL_GYRO_ID 2293760\n"
-	                  "param set CAL_ACC0_ID 1310720\n"
-	                  "param set CAL_ACC1_ID 1376256\n"
-	                  "param set CAL_MAG0_ID 196608\n"
-	                  "gyrosim start\n"
-	                  "accelsim start\n"
-	                  "rgbled start\n"
-	                  "tone_alarm start\n"
-	                  "simulator start -s\n"
-	                  "commander start\n"
-	                  "sensors start\n"
-	                  "ekf_att_pos_estimator start\n"
-	                  "mc_pos_control start\n"
-	                  "mc_att_control start\n"
-	                  "param set MAV_TYPE 2\n"
-	                  "param set RC1_MAX 2015\n"
-	                  "param set RC1_MIN 996\n"
-	                  "param set RC_TRIM 1502\n"
-	*/
+	virtual ssize_t read(struct file *filp, char *buffer, size_t buflen);
+	virtual int ioctl(struct file *filp, int cmd, unsigned long arg);
+	virtual int init();
 
-	return commands;
-	/*====================================== Working set
-	======================================*/
+	void set_passthrough(uint8_t reg, uint8_t size, uint8_t *out = NULL);
+	void passthrough_read(uint8_t reg, uint8_t *buf, uint8_t size);
+	void passthrough_write(uint8_t reg, uint8_t val);
+	void read_block(uint8_t reg, uint8_t *val, uint8_t count);
 
-	//"muorb_test start\n"
-	//"gyrosim start\n"
-	//"adcsim start\n"
+	void ak8963_reset(void);
+	bool ak8963_setup(void);
+	bool ak8963_check_id(void);
+	bool ak8963_read_adjustments(void);
 
-}
+protected:
+	friend class MPU9250;
+
+	void measure(struct ak8963_regs data);
+	int self_test(void);
+
+private:
+	MPU9250 *_parent;
+	orb_advert_t _mag_topic;
+	int _mag_orb_class_instance;
+	int _mag_class_instance;
+	bool _mag_reading_data;
+	ringbuffer::RingBuffer *_mag_reports;
+	struct mag_scale _mag_scale;
+	float _mag_range_scale;
+	perf_counter_t _mag_reads;
+	float _mag_asa_x;
+	float _mag_asa_y;
+	float _mag_asa_z;
+
+	/* do not allow to copy this class due to pointer data members */
+	MPU9250_mag(const MPU9250_mag &);
+	MPU9250_mag operator=(const MPU9250_mag &);
+};

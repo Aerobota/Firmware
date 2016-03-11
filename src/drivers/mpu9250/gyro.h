@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,28 +30,35 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+
+class MPU9250;
+
 /**
- * @file commands_default.c
- * Commands to run for the "qurt_eagle_default" config
- *
- * @author Mark Charlebois <charlebm@gmail.com>
+ * Helper class implementing the gyro driver node.
  */
-
-#include "get_commands.h"
-
-const char *get_commands()
+class MPU9250_gyro : public device::CDev
 {
+public:
+	MPU9250_gyro(MPU9250 *parent, const char *path);
+	~MPU9250_gyro();
 
-	static const char *commands =
-		"uorb start\n"
-		"param set CAL_GYRO0_ID 2293760\n"
-		"param set CAL_ACC0_ID 1310720\n"
-		"param set CAL_ACC1_ID 1376256\n"
-		"param set CAL_MAG0_ID 196608\n"
-		"commander start\n"
+	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
+	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
 
-		;
+	virtual int		init();
 
-	return commands;
+protected:
+	friend class MPU9250;
 
-}
+	void			parent_poll_notify();
+
+private:
+	MPU9250			*_parent;
+	orb_advert_t		_gyro_topic;
+	int			_gyro_orb_class_instance;
+	int			_gyro_class_instance;
+
+	/* do not allow to copy this class due to pointer data members */
+	MPU9250_gyro(const MPU9250_gyro &);
+	MPU9250_gyro operator=(const MPU9250_gyro &);
+};
